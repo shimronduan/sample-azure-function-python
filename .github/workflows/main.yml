@@ -1,0 +1,56 @@
+name: Provision Azure Resources and Deploy Python Function
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_NAME: 'sample-azure-function-python-app'
+  AZURE_RESOURCE_GROUP: 'sample-azure-function-python-rg'
+  LOCATION: 'germanywestcentral'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout GitHub Action'
+        uses: actions/checkout@v4
+
+      - name: 'Login to Azure'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 'Provision Resources with Azure CLI'
+        run: |
+          az group create --name ${{ env.AZURE_RESOURCE_GROUP }} --location ${{ env.LOCATION }}
+          az storage account create --name ${{ env.AZURE_FUNCTIONAPP_NAME }}sa --location ${{ env.LOCATION }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --sku Standard_LRS
+          az functionapp create \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --storage-account ${{ env.AZURE_FUNCTIONAPP_NAME }}sa \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --consumption-plan-location ${{ env.LOCATION }} \
+            --runtime python \
+            --runtime-version ${{ env.PYTHON_VERSION }} \
+            --os-type Linux \
+            --functions-version 4
+
+      - name: 'Setup Python Environment'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 'Install Dependencies and Package'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          zip -r deployment.zip .
+
+      - name: 'Deploy to Azure Functions'
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: 'deployment.zip'
