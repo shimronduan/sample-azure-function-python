@@ -1,4 +1,4 @@
-name: Provision Azure Resources and Deploy Python Function
+name: Provision with Terraform and Deploy Function
 
 on:
   push:
@@ -8,13 +8,37 @@ on:
 
 env:
   AZURE_FUNCTIONAPP_NAME: 'sample-azure-function-python-app'
-  AZURE_RESOURCE_GROUP: 'sample-azure-function-python-rg'
-  LOCATION: 'germanywestcentral'
   PYTHON_VERSION: '3.9'
 
 jobs:
-  build-and-deploy:
+  provision:
     runs-on: ubuntu-latest
+    name: 🏗️ Provision Infrastructure with Terraform
+    steps:
+      - name: 'Checkout code'
+        uses: actions/checkout@v4
+
+      - name: 'Setup Terraform'
+        uses: hashicorp/setup-terraform@v3
+
+      - name: 'Login to Azure'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 'Terraform Init'
+        run: terraform init -input=false
+
+      - name: 'Terraform Validate'
+        run: terraform validate
+
+      - name: 'Terraform Apply'
+        run: terraform apply -auto-approve -input=false
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: 🚀 Deploy Function Code
+    needs: provision
     steps:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@v4
@@ -23,20 +47,6 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: 'Provision Resources with Azure CLI'
-        run: |
-          az group create --name ${{ env.AZURE_RESOURCE_GROUP }} --location ${{ env.LOCATION }}
-          az storage account create --name ${{ env.AZURE_FUNCTIONAPP_NAME }}sa --location ${{ env.LOCATION }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --sku Standard_LRS
-          az functionapp create \
-            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-            --storage-account ${{ env.AZURE_FUNCTIONAPP_NAME }}sa \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --consumption-plan-location ${{ env.LOCATION }} \
-            --runtime python \
-            --runtime-version ${{ env.PYTHON_VERSION }} \
-            --os-type Linux \
-            --functions-version 4
 
       - name: 'Setup Python Environment'
         uses: actions/setup-python@v5
