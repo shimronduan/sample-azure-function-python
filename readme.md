@@ -14,4 +14,6 @@ az storage account create --name $STATE_STORAGE_ACCOUNT --resource-group $STATE_
 az storage container create --name $STATE_CONTAINER --account-name $STATE_STORAGE_ACCOUNT
 
 
-az ad sp create-for-rbac --name "sample-azure-function-python-app-sp" --sdk-auth
+az ad sp create-for-rbac --name "trading-bot-v2-app-sp" --sdk-auth
+
+az role assignment create --assignee "<YOUR_SERVICE_PRINCIPAL_APP_ID>" --role "Contributor" --scope "/subscriptions/<YOUR_SUBSCRIPTION_ID>"
